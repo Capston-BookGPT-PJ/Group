@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/activity_search"
+    android:orientation="vertical"
+    android:background="@color/gray"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:id="@+id/searchBar"
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/rectangle_white"
+        android:paddingHorizontal="16dp"
+        android:elevation="4dp">
+
+        <EditText
+            android:id="@+id/searchInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:padding="8dp"
+            android:textSize="18sp"
+            android:inputType="text"
+            android:imeOptions="actionSearch" />
+
+        <ImageButton
+            android:id="@+id/searchIcon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="5dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/browse_search"
+            android:background="@android:color/transparent"
+            android:contentDescription="검색" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/popularGroupsRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false" />
+
+</LinearLayout>
