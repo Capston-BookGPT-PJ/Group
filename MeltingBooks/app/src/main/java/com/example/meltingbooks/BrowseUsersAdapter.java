@@ -43,8 +43,9 @@ public class BrowseUsersAdapter extends RecyclerView.Adapter<BrowseUsersAdapter.
         User user = userList.get(position);
         holder.userName.setText(user.getName());
         holder.userIntro.setText(user.getIntro());
-        // 이미지 바인딩 필요시 Glide 등 사용 가능
+        holder.userImage.setImageResource(user.getImageResId());
     }
+
 
     @Override
     public int getItemCount() {

@@ -50,6 +50,32 @@
             android:windowSoftInputMode="adjustResize"
             android:exported="true" />
         <activity
+            android:name=".GroupWriteActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true" />
+        <activity
+            android:name=".GroupJoinActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true" />
+        <activity
+            android:name=".GroupNewCreateActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true" />
+        <activity
+            android:name=".GroupProfileActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true" />
+        <activity
+            android:name=".GroupCommentActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true" />
+        <!--
+        <activity
+            android:name=".GroupDetailActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true" />-->
+
+        <activity
             android:name=".SearchActivity"
             android:windowSoftInputMode="adjustResize"
             android:exported="true" />

@@ -3,10 +3,12 @@ package com.example.meltingbooks;
 public class User {
     private String name;
     private String intro;
+    private int imageResId; // 🔹 drawable 리소스 ID
 
-    public User(String name, String intro) {
+    public User(String name, String intro, int imageResId) {
         this.name = name;
         this.intro = intro;
+        this.imageResId = imageResId;
     }
 
     public String getName() {
@@ -15,5 +17,9 @@ public class User {
 
     public String getIntro() {
         return intro;
+    }
+
+    public int getImageResId() {
+        return imageResId;
     }
 }

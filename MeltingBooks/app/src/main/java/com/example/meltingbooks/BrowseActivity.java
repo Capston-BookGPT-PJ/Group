@@ -225,10 +225,10 @@ public class BrowseActivity extends AppCompatActivity {
         }
 
         // 예시 사용자 데이터
-        popularUserList.add(new User("김감성", "시를 사랑해요"));
-        popularUserList.add(new User("북마스터", "매일 3권 독서"));
-        popularUserList.add(new User("나무늘보", "천천히 읽어요"));
-        popularUserList.add(new User("책벌레", "모든 책은 친구"));
+        popularUserList.add(new User("김감성", "시를 사랑해요", R.drawable.sample_profile2));
+        popularUserList.add(new User("북마스터", "매일 3권 독서", R.drawable.sample_profile2));
+        popularUserList.add(new User("나무늘보", "천천히 읽어요", R.drawable.sample_profile2));
+        popularUserList.add(new User("책벌레", "모든 책은 친구", R.drawable.sample_profile2));
 
         userAdapter = new BrowseUsersAdapter(popularUserList);
         usersRecyclerView.setAdapter(userAdapter);

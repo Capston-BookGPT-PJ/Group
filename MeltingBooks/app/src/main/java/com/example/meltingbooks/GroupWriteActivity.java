@@ -15,11 +15,15 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -37,14 +41,11 @@ import com.google.firebase.storage.StorageReference;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import com.example.meltingbooks.BuildConfig;
-import com.example.meltingbooks.R;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Locale;
 
-import okhttp3.*;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
@@ -53,35 +54,40 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-public class UploadAudio extends AppCompatActivity {
-    private String apiKey;  // apiKey는 이제 onCreate()에서 초기화
-    private Request request;  // request는 callAPI() 메서드 내에서 생성
-    private static final int REQUEST_PERMISSION_CODE = 1001;
-    private ImageButton btnRecord, btnAddFile, btnLike, btnHashtag, btnUpload;
-    private EditText etInput;
-    private Button btnSummarize;
-    private LinearLayout middleLayout, bottomLayout;
-    private boolean isKeyboardVisible = false;
-    private ImageView imageView;
-    private StorageReference storageReference;
+public class GroupWriteActivity extends AppCompatActivity {
 
-    private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private static final int REQUEST_PERMISSION_CODE = 1001;
+
+    private EditText etInput;
+    private ImageView micImageView, summarizingImageView;
+    private ImageView imageView;
+    private ImageButton btnRecord, btnAddFile;
+    private Button btnSummarize;
+    private Spinner categorySpinner;
+
+    private LinearLayout discussionLayout;
+    private LinearLayout reviewLayout;
+    private LinearLayout goalLayout;
+    private LinearLayout groupPostLayout;
+    private LinearLayout groupNotiLayout;
+    private TextView textHint;
 
     private SpeechRecognizer speechRecognizer;
-    final int PERMISSION = 1;
-    private Intent intent;
     private Intent speechRecognizerIntent;
 
-    private ImageView micImageView, summarizingImageView;
-
-    // ChatGPT API client setup
+    private StorageReference storageReference;
+    private ActivityResultLauncher<Intent> imagePickerLauncher;
     private OkHttpClient client;
+    private Request request;
+    private String apiKey;
+    private Intent intent;
 
+    private boolean isKeyboardVisible = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_write);
+        setContentView(R.layout.group_post_write);
 
         //위 상단바색상
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -92,97 +98,41 @@ public class UploadAudio extends AppCompatActivity {
             decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);  // 아이콘 색상 어둡게!
         }
 
-
-
+        // API 키와 네트워크 클라이언트 초기화
         apiKey = BuildConfig.OPENAI_API_KEY;
-
-        ///안드로이드 6.0버전 이상인지 체크해서 퍼미션
-        if(Build.VERSION.SDK_INT >= 23){
-            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.INTERNET,
-                    Manifest.permission.RECORD_AUDIO},PERMISSION);
-        }
-
-        storageReference = FirebaseStorage.getInstance().getReference("audio");
-
-        btnUpload = findViewById(R.id.btnUpload);
-        btnAddFile = findViewById(R.id.btnAddFile);
-        btnLike = findViewById(R.id.btnLike);
-        btnHashtag = findViewById(R.id.btnHashtag);
-        imageView = findViewById(R.id.imageView);
-        etInput = findViewById(R.id.etInput);
-        middleLayout = findViewById(R.id.middleLayout);
-        bottomLayout = findViewById(R.id.bottomLayout);
-        btnRecord = findViewById(R.id.btnRecord);
-        btnSummarize = findViewById(R.id.btnSummarize);
-
-        micImageView = findViewById(R.id.micON);
-        summarizingImageView = findViewById(R.id.summarizing);
-
-        // Initialize OkHttpClient for ChatGPT API
         client = new OkHttpClient();
 
-        // 음성 인식 권한 확인
+
+        // Firebase Storage 참조 초기화 (필요시 사용)
+        storageReference = FirebaseStorage.getInstance().getReference("audio");
+
+        // 뷰 초기화
+        etInput = findViewById(R.id.etInput);
+        micImageView = findViewById(R.id.micON);
+        summarizingImageView = findViewById(R.id.summarizing);
+        imageView = findViewById(R.id.imageView);
+        btnRecord = findViewById(R.id.btnRecord);
+        btnAddFile = findViewById(R.id.btnAddFile);
+        btnSummarize = findViewById(R.id.btnSummarize);
+        categorySpinner = findViewById(R.id.categorySpinner);
+        discussionLayout = findViewById(R.id.discussionLayout);
+        reviewLayout = findViewById(R.id.reviewLayout);
+        goalLayout = findViewById(R.id.goalLayout);
+        groupPostLayout = findViewById(R.id.groupPostLayout);
+        groupNotiLayout = findViewById(R.id.groupNotiLayout);
+        textHint = findViewById(R.id.textHint);
+
+        // 권한 체크
         checkPermissions();
 
-        // editText 기능
-        etInput.setOnClickListener(v -> {
-            if (isKeyboardVisible) {
-                // 키보드가 보이면 숨김
-                hideKeyboard();
-            } else {
-                // 키보드가 숨겨져 있으면 보임
-                etInput.requestFocus();
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.showSoftInput(etInput, InputMethodManager.SHOW_IMPLICIT);
-            }
-            isKeyboardVisible = !isKeyboardVisible; // 키보드 상태 반전
-        });
+        // 이미지 선택기 설정
+        setupImagePicker();
 
-        // 첨부 파일 추가
-        imagePickerLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        Uri imageUri = result.getData().getData();
-                        imageView.setImageURI(imageUri);
-                    }
-                });
+        // 스피너 설정 (카테고리별 레이아웃 토글)
+        setupSpinner();
 
-        btnAddFile.setOnClickListener(v -> {
-            Intent intent = new Intent();
-            intent.setType("image/*");
-            intent.setAction(Intent.ACTION_GET_CONTENT);
-            imagePickerLauncher.launch(intent);
-        });
-
-        checkPermissions();
-
-        btnLike.setOnClickListener(v -> {
-            // 좋아요 기능 구현
-        });
-
-        btnHashtag.setOnClickListener(v -> {
-            // 해시태그 기능 구현
-        });
-
-        // EditText에 입력 감지하는 TextWatcher 추가
-        etInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                // 입력된 텍스트 길이가 5자 이상이면 버튼 활성화
-                if (s.length() >= 5) {
-                    btnSummarize.setVisibility(View.VISIBLE);  // 입력 5자 이상 → 버튼 보이기
-                } else {
-                    btnSummarize.setVisibility(View.GONE);  // 5자 미만 → 버튼 숨기기
-                }
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {}
-        });
+        // EditText 클릭 및 텍스트 감지 리스너 설정
+        setupEditTextListeners();
 
         // 요약하기 버튼 클릭 리스너
         btnSummarize.setOnClickListener(v -> {
@@ -194,6 +144,141 @@ public class UploadAudio extends AppCompatActivity {
             // 텍스트를 요약하는 로직
             String inputText = etInput.getText().toString();
             callAPI(inputText);  // ChatGPT API 호출
+        });
+
+
+    }
+    private boolean isSpinnerInitialized = false;
+
+    private void setupSpinner() {
+
+        // 문자열 배열 리소스를 가져와서 Spinner에 연결
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                this,
+                R.array.groupPost_categories,
+                R.layout.spinner_item  // 커스텀 일반 아이템 레이아웃
+        );
+
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);  // 커스텀 드롭다운 아이템 레이아웃
+
+        categorySpinner.setAdapter(adapter);
+
+
+        categorySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedCategory = parent.getItemAtPosition(position).toString();
+                if (!isSpinnerInitialized) {
+                    isSpinnerInitialized = true;
+                    return;  // 초기 호출 무시, UI는 모두 gone 상태 유지
+                }
+                // 선택된 카테고리에 맞게 레이아웃 보여주기
+                switch (position) {
+                    case 0:
+                        discussionLayout.setVisibility(View.GONE);
+                        reviewLayout.setVisibility(View.GONE);
+                        goalLayout.setVisibility(View.GONE);
+                        groupPostLayout.setVisibility(View.GONE);
+                        groupNotiLayout.setVisibility(View.GONE);
+                        textHint.setVisibility(View.VISIBLE);
+                        break;
+                    case 1:
+                        discussionLayout.setVisibility(View.VISIBLE);
+                        reviewLayout.setVisibility(View.GONE);
+                        goalLayout.setVisibility(View.GONE);
+                        groupPostLayout.setVisibility(View.GONE);
+                        groupNotiLayout.setVisibility(View.GONE);
+                        textHint.setVisibility(View.GONE);
+
+                        break;
+                    case 2:
+                        discussionLayout.setVisibility(View.GONE);
+                        reviewLayout.setVisibility(View.VISIBLE);
+                        goalLayout.setVisibility(View.GONE);
+                        groupPostLayout.setVisibility(View.GONE);
+                        groupNotiLayout.setVisibility(View.GONE);
+                        textHint.setVisibility(View.GONE);
+                        break;
+                    case 3:
+                        discussionLayout.setVisibility(View.GONE);
+                        reviewLayout.setVisibility(View.GONE);
+                        goalLayout.setVisibility(View.VISIBLE);
+                        groupPostLayout.setVisibility(View.GONE);
+                        groupNotiLayout.setVisibility(View.GONE);
+                        textHint.setVisibility(View.GONE);
+                        break;
+                    case 4:
+                        discussionLayout.setVisibility(View.GONE);
+                        reviewLayout.setVisibility(View.GONE);
+                        goalLayout.setVisibility(View.GONE);
+                        groupPostLayout.setVisibility(View.VISIBLE);
+                        groupNotiLayout.setVisibility(View.GONE);
+                        textHint.setVisibility(View.GONE);
+                        break;
+                    case 5:
+                        discussionLayout.setVisibility(View.GONE);
+                        reviewLayout.setVisibility(View.GONE);
+                        goalLayout.setVisibility(View.GONE);
+                        groupPostLayout.setVisibility(View.GONE);
+                        groupNotiLayout.setVisibility(View.VISIBLE);
+                        textHint.setVisibility(View.GONE);
+                        break;
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                discussionLayout.setVisibility(View.GONE);
+                reviewLayout.setVisibility(View.GONE);
+                goalLayout.setVisibility(View.GONE);
+                groupPostLayout.setVisibility(View.GONE);
+                groupNotiLayout.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void setupEditTextListeners() {
+        etInput.setOnClickListener(v -> {
+            if (isKeyboardVisible) {
+                hideKeyboard();
+            } else {
+                etInput.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.showSoftInput(etInput, InputMethodManager.SHOW_IMPLICIT);
+            }
+            isKeyboardVisible = !isKeyboardVisible;
+        });
+
+        etInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (s.length() >= 5) {
+                    btnSummarize.setVisibility(View.VISIBLE);
+                } else {
+                    btnSummarize.setVisibility(View.GONE);
+                }
+            }
+
+            @Override public void afterTextChanged(Editable s) {}
+        });
+    }
+
+    private void setupImagePicker() {
+        imagePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        Uri imageUri = result.getData().getData();
+                        imageView.setImageURI(imageUri);
+                    }
+                });
+
+        btnAddFile.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            imagePickerLauncher.launch(intent);
         });
 
         /// RecognizerIntent 생성
@@ -211,7 +296,7 @@ public class UploadAudio extends AppCompatActivity {
             public void onClick(View v) {
                 btnSummarize.setVisibility(View.GONE);
                 initSpeechRecognizer();
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(UploadAudio.this); // 새 SpeechRecognizer 를 만드는 팩토리 메서드
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(GroupWriteActivity.this); // 새 SpeechRecognizer 를 만드는 팩토리 메서드
                 speechRecognizer.setRecognitionListener(listener); // 리스너 설정
                 // micON 뷰를 찾고 visibility를 VISIBLE로 변경
                 if (micImageView != null) {
@@ -332,9 +417,79 @@ public class UploadAudio extends AppCompatActivity {
         speechRecognizer.setRecognitionListener(listener);
     }
 
+
+
+    private void startSpeechRecognition() {
+        micImageView.setVisibility(View.VISIBLE);
+        etInput.setHint("");
+        speechRecognizer.startListening(speechRecognizerIntent);
+    }
+
+    private void callAPI(String text) {
+        JSONObject object = new JSONObject();
+        try {
+            object.put("model", "gpt-3.5-turbo");
+            JSONArray messagesArray = new JSONArray();
+            JSONObject systemMsg = new JSONObject();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "You are a helpful assistant that summarizes text.");
+            messagesArray.put(systemMsg);
+            JSONObject userMsg = new JSONObject();
+            userMsg.put("role", "user");
+            userMsg.put("content", "다음 내용을 사용자의 감상을 중심으로 요약해줘:\n" + text);
+            messagesArray.put(userMsg);
+            object.put("messages", messagesArray);
+            object.put("temperature", 0.7);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        RequestBody body = RequestBody.create(object.toString(), MediaType.get("application/json; charset=utf-8"));
+        request = new Request.Builder()
+                .url("https://api.openai.com/v1/chat/completions")
+                .header("Authorization", "Bearer " + apiKey)
+                .post(body)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                runOnUiThread(() -> {
+                    summarizingImageView.setVisibility(View.GONE);
+                    Toast.makeText(GroupWriteActivity.this, "요약 실패", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                String responseBody = response.body().string();
+                if (response.isSuccessful()) {
+                    try {
+                        JSONObject jsonResponse = new JSONObject(responseBody);
+                        JSONArray choices = jsonResponse.getJSONArray("choices");
+                        String summarizedText = choices.getJSONObject(0).getJSONObject("message").getString("content");
+                        runOnUiThread(() -> {
+                            etInput.setText(summarizedText);
+                            summarizingImageView.setVisibility(View.GONE);
+                            btnSummarize.setVisibility(View.VISIBLE);
+                        });
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    runOnUiThread(() -> {
+                        summarizingImageView.setVisibility(View.GONE);
+                        Toast.makeText(GroupWriteActivity.this, "API 호출 오류: " + responseBody, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+        });
+    }
+
     private void checkPermissions() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_PERMISSION_CODE);
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_PERMISSION_CODE);
         }
     }
 
@@ -344,18 +499,19 @@ public class UploadAudio extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
         if (requestCode == REQUEST_PERMISSION_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "권한 허용 완료", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "권한을 허용해야 음성 인식이 가능합니다.", Toast.LENGTH_SHORT).show();
             }
         }
     }
-
     private void showSpeechRecognitionUI() {
         // 음성 인식 중 이미지 보이기
         if (micImageView != null) {
@@ -371,77 +527,11 @@ public class UploadAudio extends AppCompatActivity {
         }
     }
 
-    // ChatGPT API 호출
-    private void callAPI(String question) {
-        // 요약 중 이미지를 보이게
-        summarizingImageView.setVisibility(View.VISIBLE);
-
-        JSONObject object = new JSONObject();
-        try {
-            object.put("model", "gpt-3.5-turbo");
-            JSONArray messagesArray = new JSONArray();
-
-            // 시스템 역할 추가
-            JSONObject systemMessage = new JSONObject();
-            systemMessage.put("role", "system");
-            systemMessage.put("content", "You are a helpful assistant that summarizes text.");
-            messagesArray.put(systemMessage);
-
-            // 사용자 입력 추가
-            JSONObject messageObj = new JSONObject();
-            messageObj.put("role", "user");
-            messageObj.put("content", "다음 내용을 사용자의 감상을 중심으로 요약해줘:\\n" + question);  // 명확한 요청 추가
-            messagesArray.put(messageObj);
-            object.put("messages", messagesArray);
-            object.put("temperature", 0.7); // 다양성을 조절하는 옵션
-        } catch (JSONException e) {
-            e.printStackTrace();
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (speechRecognizer != null) {
+            speechRecognizer.destroy();
         }
-
-        RequestBody body = RequestBody.create(object.toString(), MediaType.get("application/json; charset=utf-8"));
-        request = new Request.Builder()
-                .url("https://api.openai.com/v1/chat/completions")
-                .header("Authorization", "Bearer " + apiKey)  // apiKey를 사용
-                .post(body)
-                .build();
-
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                // 요청 실패 처리
-                runOnUiThread(() -> {
-                    summarizingImageView.setVisibility(View.GONE);  // 요약 중 이미지 숨기기
-                    Toast.makeText(UploadAudio.this, "요약 실패", Toast.LENGTH_SHORT).show();
-                });
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                String responseBody = response.body().string();
-                Log.d("API_RESPONSE", responseBody);  // 응답 로깅
-
-
-                if (response.isSuccessful()) {
-                    try {
-                        JSONObject jsonResponse = new JSONObject(responseBody);
-                        JSONArray choices = jsonResponse.getJSONArray("choices");
-                        String summarizedText = choices.getJSONObject(0).getJSONObject("message").getString("content");
-
-                        runOnUiThread(() -> {
-                            etInput.setText(summarizedText);
-                            summarizingImageView.setVisibility(View.GONE);
-                            btnSummarize.setVisibility(View.VISIBLE);
-                        });
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                } else {
-                    runOnUiThread(() -> {
-                        summarizingImageView.setVisibility(View.GONE);
-                        Toast.makeText(UploadAudio.this, "API 호출 오류: " + responseBody, Toast.LENGTH_SHORT).show();
-                    });
-                }
-            }
-        });
     }
 }
